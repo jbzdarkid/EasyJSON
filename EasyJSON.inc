@@ -1,4 +1,7 @@
-// Zephyrus's basic JSON implementation
+#if defined _easyjson_included
+ #endinput
+#endif
+#define _easyjson_included
 
 stock Handle:CreateJSON()
 {
@@ -8,7 +11,7 @@ stock Handle:CreateJSON()
 	return m_hJSON;
 }
 
-stock Handle:DecodeJSON(const String:json[])
+stock Handle:DecodeJSON(const String:json[], &len=0)
 {
 	decl m_iPos, m_iIgnore;
 	new m_iLength = strlen(json);
@@ -36,12 +39,27 @@ stock Handle:DecodeJSON(const String:json[])
 			strcopy(m_szKey, m_iStringEnd-m_iStringStart+1, json[m_iPos+m_iStringStart]);
 			m_iPos += m_iStringEnd+1;
 			m_iPos += JSONIgnore(json[m_iPos]);
-			if(GetJSONString(json[m_iPos], m_iStringStart, m_iStringEnd))
+			if(json[m_iPos] == '{')
+			{
+				new m_iLen = -1;
+				new Handle:m_hObject = DecodeJSON(json[m_iPos], m_iLen);
+				if(m_hObject != INVALID_HANDLE)
+				{
+					JSONSetObject(m_hJSON, m_szKey, m_hObject);
+					m_iPos += m_iLen+1;
+				}
+				else
+				{
+					DestroyJSON(m_hJSON);
+					return INVALID_HANDLE;
+				}
+			} else if(GetJSONString(json[m_iPos], m_iStringStart, m_iStringEnd))
 			{
 				new String:m_szValue[m_iStringEnd-m_iStringStart+1];
 				strcopy(m_szValue, m_iStringEnd-m_iStringStart+1, json[m_iPos+m_iStringStart]);
 				m_iPos += m_iStringEnd+1;
 				m_iPos += JSONIgnore(json[m_iPos]);
+
 				if(m_iStringStart != 0)
 					JSONSetString(m_hJSON, m_szKey, m_szValue);
 				else if(strcmp(m_szValue, "true")==0)
@@ -53,6 +71,8 @@ stock Handle:DecodeJSON(const String:json[])
 			}
 		}
 	}
+	if(len != 0)
+		len = m_iPos;
 
 	return m_hJSON;
 }
@@ -160,6 +180,20 @@ stock JSONSetInteger(&Handle:json, const String:key[], value)
 	SetTrieValue(json, key, m_hObject);
 }
 
+stock JSONSetObject(&Handle:json, const String:key[], Handle:value)
+{
+	new Handle:m_hKeyArray = INVALID_HANDLE;
+	if(!GetTrieValue(json, "json_key_array", m_hKeyArray))
+		return;
+	PushArrayString(m_hKeyArray, key);
+
+	new Handle:m_hObject = CreateTrie();
+	SetTrieValue(m_hObject, "value", value);
+	SetTrieString(m_hObject, "type", "object");
+	SetTrieValue(m_hObject, "size", sizeof(value));
+	SetTrieValue(json, key, m_hObject);
+}
+
 stock bool:JSONGetString(&Handle:json, const String:key[], String:out[], maxlen)
 {
 	decl Handle:m_hObject;
@@ -170,6 +204,19 @@ stock bool:JSONGetString(&Handle:json, const String:key[], String:out[], maxlen)
 	if(strcmp(m_szType, "string")!=0)
 		return false;
 	GetTrieString(m_hObject, "value", out, maxlen);
+	return true;
+}
+
+stock bool:JSONGetObject(&Handle:json, const String:key[], &Handle:out)
+{
+	decl Handle:m_hObject;
+	if(!GetTrieValue(json, key, m_hObject))
+		return false;
+	decl String:m_szType[32];
+	GetTrieString(m_hObject, "type", STRING(m_szType));
+	if(strcmp(m_szType, "object")!=0)
+		return false;
+	GetTrieValue(m_hObject, "value", out);
 	return true;
 }
 
@@ -259,14 +306,31 @@ stock bool:GetJSONString(const String:json[], &start, &end)
 
 stock DestroyJSON(&Handle:json)
 {
-	new Handle:m_hTypeTrie = INVALID_HANDLE;
-	new Handle:m_hSizeTrie = INVALID_HANDLE;
 	new Handle:m_hKeyArray = INVALID_HANDLE;
-	if(GetTrieValue(json, "json_type_trie", m_hTypeTrie))
-		CloseHandle(m_hTypeTrie);
-	if(GetTrieValue(json, "json_size_trie", m_hTypeTrie))
-		CloseHandle(m_hSizeTrie);
 	if(!GetTrieValue(json, "json_key_array", m_hKeyArray))
-		CloseHandle(m_hKeyArray);
+	{
+		CloseHandle(json);
+		return;
+	}
+
+	new m_iKeys = GetArraySize(m_hKeyArray);
+	decl String:m_szKey[512];
+	decl Handle:m_hObject;
+	for(new i=0;i<m_iKeys;++i)
+	{
+		GetArrayString(m_hKeyArray, i, STRING(m_szKey));
+		if(!GetTrieValue(json, m_szKey, m_hObject))
+			continue;
+		decl String:m_szType[32];
+		GetTrieString(m_hObject, "type", STRING(m_szType));
+		if(strcmp(m_szType, "object")==0)
+		{
+			new Handle:m_hValue;
+			GetTrieValue(m_hObject, "value", m_hValue);
+			DestroyJSON(m_hValue);
+		}
+	}
+
+	CloseHandle(m_hKeyArray);
 	CloseHandle(json);
 }
