@@ -405,14 +405,16 @@ stock DestroyJSON(&Handle:json)
 		GetArrayString(m_hKeyArray, i, STRING(m_szKey));
 		if(!GetTrieValue(json, m_szKey, m_hObject))
 			continue;
-		decl String:m_szType[32];
-		GetTrieString(m_hObject, "type", STRING(m_szType));
-		if(strcmp(m_szType, "object")==0)
+		decl JSONType:m_eType;
+		GetTrieValue(m_hObject, "type", m_eType);
+		if(m_eType == Type_Object)
 		{
 			new Handle:m_hValue;
 			GetTrieValue(m_hObject, "value", m_hValue);
 			DestroyJSON(m_hValue);
 		}
+		else
+			CloseHandle(m_hObject);
 	}
 
 	CloseHandle(m_hKeyArray);
