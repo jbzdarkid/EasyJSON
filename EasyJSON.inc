@@ -34,8 +34,6 @@ stock Handle:DecodeJSON(const String:json[], &len=0)
 	if(m_iIgnore == -1)
 		return INVALID_HANDLE;
 	m_iPos += m_iIgnore;
-	if(json[m_iPos] == '}')
-		return INVALID_HANDLE;
 
 	decl m_iStringStart;
 	decl m_iStringEnd;
@@ -51,7 +49,6 @@ stock Handle:DecodeJSON(const String:json[], &len=0)
 			strcopy(m_szKey, m_iStringEnd-m_iStringStart+1, json[m_iPos+m_iStringStart]);
 			m_iPos += m_iStringEnd+1;
 			m_iPos += JSONIgnore(json[m_iPos]);
-
 			if(json[m_iPos] == '{')
 			{
 				new m_iLen = -1;
@@ -67,7 +64,7 @@ stock Handle:DecodeJSON(const String:json[], &len=0)
 					DestroyJSON(m_hJSON);
 					return INVALID_HANDLE;
 				}
-			} if(json[m_iPos] == '[')
+			} else if(json[m_iPos] == '[')
 			{
 				new m_iLen = -1;
 				new Handle:m_hObject = DecodeArray(json[m_iPos], m_iLen);
@@ -87,8 +84,9 @@ stock Handle:DecodeJSON(const String:json[], &len=0)
 				new String:m_szValue[m_iStringEnd-m_iStringStart+1];
 				strcopy(m_szValue, m_iStringEnd-m_iStringStart+1, json[m_iPos+m_iStringStart]);
 
-				if(json[m_iPos+m_iStringEnd]=='}')
+				if(json[m_iPos+m_iStringEnd+1]=='}'){
 					m_bEnd = true;
+				}
 				m_iPos += m_iStringEnd+1;
 				m_iPos += JSONIgnore(json[m_iPos]);
 
@@ -114,9 +112,10 @@ stock Handle:DecodeJSON(const String:json[], &len=0)
 			}
 		}
 	}
+	if(json[m_iPos] == '}')
+		m_iPos += 1;
 	if(len != 0)
 		len = m_iPos;
-
 	return m_hJSON;
 }
 
@@ -133,8 +132,6 @@ stock Handle:DecodeArray(const String:json[], &len=0)
 	if(m_iIgnore == -1)
 		return INVALID_HANDLE;
 	m_iPos += m_iIgnore;
-	if(json[m_iPos] == ']')
-		return INVALID_HANDLE;
 
 	decl m_iStringStart;
 	decl m_iStringEnd;
@@ -154,13 +151,14 @@ stock Handle:DecodeArray(const String:json[], &len=0)
 				PushArrayCell(m_hArray, JSONCreateObject(m_hObject));
 				m_iPos += m_iLen;
 				m_iPos += JSONIgnore(json[m_iPos]);
+
 			}
 			else
 			{
 				DestroyJSONArray(m_hArray);
 				return INVALID_HANDLE;
 			}
-		} if(json[m_iPos] == '[')
+		} else if(json[m_iPos] == '[')
 		{
 			new m_iLen = -1;
 			new Handle:m_hObject = DecodeArray(json[m_iPos], m_iLen);
@@ -180,8 +178,9 @@ stock Handle:DecodeArray(const String:json[], &len=0)
 			new String:m_szValue[m_iStringEnd-m_iStringStart+1];
 			strcopy(m_szValue, m_iStringEnd-m_iStringStart+1, json[m_iPos+m_iStringStart]);
 
-			if(json[m_iPos+m_iStringEnd]==']')
+			if(json[m_iPos+m_iStringEnd+1]==']'){
 				m_bEnd = true;
+			}
 			m_iPos += m_iStringEnd+1;
 			m_iPos += JSONIgnore(json[m_iPos]);
 
@@ -206,9 +205,10 @@ stock Handle:DecodeArray(const String:json[], &len=0)
 			}
 		}
 	}
+	if(json[m_iPos] == ']')
+		m_iPos += 1;
 	if(len != 0)
 		len = m_iPos;
-
 	return m_hArray;
 }
 
@@ -241,7 +241,7 @@ stock EncodeJSON(&Handle:json, String:output[], maxlen, bool:beautify=true, &len
 	}
 	for(new i=0;i<m_iKeys;++i)
 	{
-		GetArrayString(m_hKeyArray, i, STRING(m_szKey));
+		GetArrayString(m_hKeyArray, i, m_szKey, sizeof(m_szKey));
 		if(!GetTrieValue(json, m_szKey, m_hObject))
 			continue;
 		decl JSONType:m_eType;
@@ -792,7 +792,7 @@ stock DestroyJSON(&Handle:json)
 	decl Handle:m_hObject;
 	for(new i=0;i<m_iKeys;++i)
 	{
-		GetArrayString(m_hKeyArray, i, STRING(m_szKey));
+		GetArrayString(m_hKeyArray, i, m_szKey, sizeof(m_szKey));
 		if(!GetTrieValue(json, m_szKey, m_hObject))
 			continue;
 		decl JSONType:m_eType;
