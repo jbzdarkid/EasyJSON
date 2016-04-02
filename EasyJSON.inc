@@ -232,9 +232,13 @@ stock EncodeJSON(&Handle:json, String:output[], maxlen, bool:beautify=true, &len
 		for(new i=0;i<tabs;++i)
 			m_szTabs[i] = '\t';
 
-	new m_iPos = 2;
+	new m_iPos = 1;
 	output[0] = '{';
-	output[1] = '\n';
+	if(beautify)
+	{
+		output[1] = '\n';
+		++m_iPos;
+	}
 	for(new i=0;i<m_iKeys;++i)
 	{
 		GetArrayString(m_hKeyArray, i, STRING(m_szKey));
@@ -288,6 +292,22 @@ stock EncodeJSON(&Handle:json, String:output[], maxlen, bool:beautify=true, &len
 				EncodeJSON(m_hValue, output[m_iPos], maxlen-m_iPos, beautify, m_iLen, tabs+1);
 				m_iPos += m_iLen;
 			}
+
+			case Type_Array:
+			{
+				decl Handle:m_hValue;
+				GetTrieValue(m_hObject, "value", m_hValue);
+				m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%s\"%s\": ", m_szTabs, m_szKey);
+
+				new m_iLen = -1;
+				EncodeArray(m_hValue, output[m_iPos], maxlen-m_iPos, beautify, m_iLen, tabs+1);
+				m_iPos += m_iLen+1;
+			}
+
+			default:
+			{
+				continue;
+			}
 		}
 		if(m_iPos >= maxlen)
 			return;
@@ -299,8 +319,10 @@ stock EncodeJSON(&Handle:json, String:output[], maxlen, bool:beautify=true, &len
 		if(m_iPos >= maxlen)
 			return;
 		if(beautify)
+		{
 			output[m_iPos] = '\n';
-		++m_iPos;
+			++m_iPos;
+		}
 	}
 	if(m_iPos < maxlen)
 	{
@@ -309,6 +331,116 @@ stock EncodeJSON(&Handle:json, String:output[], maxlen, bool:beautify=true, &len
 	}
 	if(len != 0)
 		len=m_iPos;
+}
+
+stock EncodeArray(&Handle:json, String:output[], maxlen, bool:beautify=true, &len=0, tabs=1)
+{
+	decl Handle:m_hObject;
+
+	if(2 >= maxlen)
+		return;
+
+	new String:m_szTabs[tabs+1];
+	if(beautify)
+		for(new i=0;i<tabs;++i)
+			m_szTabs[i] = '\t';
+
+	new m_iPos = 1;
+	output[0] = '[';
+	if(beautify)
+	{
+		output[1] = '\n';
+		++m_iPos;
+	}
+
+	new m_iKeys = GetArraySize(json);
+
+	for(new i=0;i<m_iKeys;++i)
+	{
+		m_hObject = GetArrayCell(json, i);
+
+		decl JSONType:m_eType;
+		GetTrieValue(m_hObject, "type", m_eType);
+		switch(m_eType)
+		{
+			case Type_String:
+			{
+				decl m_iLength;
+				GetTrieValue(m_hObject, "size", m_iLength);
+				decl String:m_szValue[m_iLength*2+1];
+				GetTrieString(m_hObject, "value", m_szValue, m_iLength+1);
+				ReplaceString(m_szValue, m_iLength*2+1, "\"", "\\\"");
+				m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%s\"%s\"", m_szTabs, m_szValue);
+			}
+
+			case Type_Boolean:
+			{
+				decl bool:m_bValue;
+				GetTrieValue(m_hObject, "value", m_bValue);
+				if(m_bValue)
+					m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%strue", m_szTabs);
+				else
+					m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%sfalse", m_szTabs);
+			}
+
+			case Type_Integer:
+			{
+				decl m_iValue;
+				GetTrieValue(m_hObject, "value", m_iValue);
+				m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%s%d", m_szTabs, m_iValue);
+			}
+
+			case Type_Float:
+			{
+				decl Float:m_fValue;
+				GetTrieValue(m_hObject, "value", m_fValue);
+				m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%s%f", m_szTabs, m_fValue);
+			}
+
+			case Type_Object:
+			{
+				decl Handle:m_hValue;
+				GetTrieValue(m_hObject, "value", m_hValue);
+				m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%s", m_szTabs);
+
+				new m_iLen = -1;
+				EncodeJSON(m_hValue, output[m_iPos], maxlen-m_iPos, beautify, m_iLen, tabs+1);
+				m_iPos += m_iLen;
+			}
+
+			case Type_Array:
+			{
+				decl Handle:m_hValue;
+				GetTrieValue(m_hObject, "value", m_hValue);
+				m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%s", m_szTabs);
+
+				new m_iLen = -1;
+				EncodeArray(m_hValue, output[m_iPos], maxlen-m_iPos, beautify, m_iLen, tabs+1);
+				m_iPos += m_iLen;
+			}
+		}
+		if(m_iPos >= maxlen)
+			return;
+		if(m_iKeys != i+1)
+		{
+			output[m_iPos] = ',';
+			++m_iPos;
+		}
+		if(m_iPos >= maxlen)
+			return;
+		if(beautify)
+		{
+			output[m_iPos] = '\n';
+			++m_iPos;
+		}
+	}
+	if(m_iPos < maxlen)
+	{
+		m_szTabs[tabs-1] = 0;
+		m_iPos += Format(output[m_iPos], maxlen-m_iPos, "%s]", m_szTabs);
+	}
+	if(len != 0)
+		len=m_iPos-1;
 }
 
 stock JSONSetString(&Handle:json, const String:key[], const String:value[])
